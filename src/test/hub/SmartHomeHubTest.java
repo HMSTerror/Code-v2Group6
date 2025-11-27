@@ -345,5 +345,75 @@ public class SmartHomeHubTest {
             actions.add(new SceneAction("Thermo1", new DeviceState()));
         }, "getActions() 必须返回不可修改的列表（防止外部破坏场景）。");
     }
+
+    /**
+     * 最后的边界：验证无效数据类型输入
+     */
+
+    @Test
+    void smartLight_ApplyInvalidType_ThrowsValidationException() {
+        // Light: power 必须是 Boolean
+        DeviceState invalidTypeState1 = new DeviceState(Map.of("power", "ON")); // 传入 String
+        assertThrows(ValidationException.class, () -> {
+            light1.applyState(invalidTypeState1);
+        }, "power 必须是 Boolean，传入 String 应该失败。");
+
+        // Light: brightness 必须是 Number
+        DeviceState invalidTypeState2 = new DeviceState(Map.of("brightness", "High")); // 传入 String
+        assertThrows(ValidationException.class, () -> {
+            light1.applyState(invalidTypeState2);
+        }, "brightness 必须是 Number，传入 String 应该失败。");
+    }
+
+    @Test
+    void smartThermostat_ApplyInvalidType_ThrowsValidationException() {
+        // Thermostat: power 必须是 Boolean
+        DeviceState invalidTypeState1 = new DeviceState(Map.of("power", 1)); // 传入 Integer
+        assertThrows(ValidationException.class, () -> {
+            thermo1.applyState(invalidTypeState1);
+        }, "power 必须是 Boolean，传入 Integer 应该失败。");
+
+        // Thermostat: targetTemperature 必须是 Number
+        DeviceState invalidTypeState2 = new DeviceState(Map.of("targetTemperature", false)); // 传入 Boolean
+        assertThrows(ValidationException.class, () -> {
+            thermo1.applyState(invalidTypeState2);
+        }, "targetTemperature 必须是 Number，传入 Boolean 应该失败。");
+    }
+
+    @Test
+    void smartLock_ApplyInvalidType_ThrowsValidationException() {
+        // Lock: locked 必须是 Boolean
+        DeviceState invalidTypeState = new DeviceState(Map.of("locked", 0)); // 传入 Integer
+        assertThrows(ValidationException.class, () -> {
+            lock1.applyState(invalidTypeState);
+        }, "locked 必须是 Boolean，传入 Integer 应该失败。");
+    }
+
+    @Test
+    void applyToGroup_MissingDevice_IsSkippedSuccessfully() throws ExecutionException, ValidationException {
+        // 1. 初始状态：Light1 power=false
+        DeviceState originalLightState = light1.getState();
+
+        // 2. 注销一个设备（使其在群组中缺失）
+        hub.deregisterDevice(admin, "Thermo1");
+
+        // 3. 创建群组，包含 Light1（存在）和 Thermo1（缺失）
+        hub.createGroup(admin, "TestSkipGroup", List.of("Light1", "Thermo1"));
+
+        // 4. 应用状态：Light1 power=true, Thermo1 状态无关紧要
+        DeviceState applyState = new DeviceState(Map.of("power", true));
+
+        // 5. 执行群组操作：预期成功（因为跳过了缺失的 Thermo1）
+        // 备注：如果这里抛出 ExecutionException，则表示代码逻辑错误。
+        assertDoesNotThrow(() -> {
+            hub.applyToGroup(admin, "TestSkipGroup", applyState);
+        }, "群组操作应跳过缺失的设备并继续，不应抛出异常。");
+
+        // 6. 验证 Light1 (存在的设备) 成功被更新
+        assertTrue((Boolean) light1.getState().get("power"), "存在的设备 Light1 必须成功更新。");
+
+        // 7. 验证 Thermo1 (缺失的设备) 不在集线器中
+        assertTrue(hub.getDevice("Thermo1").isEmpty(), "缺失的设备不应在集线器中。");
+    }
 }
 
