@@ -208,4 +208,142 @@ public class SmartHomeHubTest {
             hub.executeScene(child, "AuthTestScene");
         }, "Child 缺乏 EXECUTE_SCENES 权限。");
     }
+
+    @Test
+    void deviceManagement_DeregisterNonExistentDevice_NoException() {
+        // 尝试注销一个不存在的设备名称，系统不应抛出异常，并安全完成操作。
+        assertDoesNotThrow(() -> {
+            hub.deregisterDevice(admin, "NonExistentDevice");
+        }, "注销不存在的设备时不应抛出异常。");
+
+        // 验证 Light1 仍然存在（未被意外删除）
+        assertTrue(hub.getDevice("Light1").isPresent(), "现有设备不应被意外删除。");
+    }
+
+    @Test
+    void deviceManagement_RegisterDuplicateDevice_OverwritesExisting() {
+        SmartLight newLight = new SmartLight("Light1"); // 使用相同的名称
+        hub.registerDevice(admin, newLight);
+
+        // 验证：集线器中存储的设备实例是否被新的 Light 实例替换
+        Device retrievedDevice = hub.getDevice("Light1").orElseThrow();
+        assertNotSame(light1, retrievedDevice, "重复注册的设备实例应该被新的对象替换。");
+        assertSame(newLight, retrievedDevice, "集线器应存储新的设备实例。");
+    }
+
+    @Test
+    void executeScene_MissingDevice_ThrowsExecutionExceptionAndRollsBack() throws ValidationException {
+        // 1. 记录初始状态：Light1 状态为默认 (power=false)
+        DeviceState originalLightState = light1.getState();
+
+        // 2. 更改 Light1 状态 (第一个成功动作)
+        DeviceState turnOn = new DeviceState(Map.of("power", true));
+        light1.applyState(turnOn);
+        assertTrue((Boolean) light1.getState().get("power"), "Light1 状态应为 ON。");
+
+        // 3. 注销一个设备 (使其在场景执行时缺失)
+        hub.deregisterDevice(admin, "Thermo1");
+
+        // 4. 创建场景：Light1 成功操作 -> Thermo1 缺失操作（失败）
+        Scene missingDeviceScene = new Scene("MissingDeviceScene");
+        missingDeviceScene.addAction(new SceneAction("Light1", new DeviceState(Map.of("brightness", 50))));
+        missingDeviceScene.addAction(new SceneAction("Thermo1", new DeviceState(Map.of("targetTemperature", 25.0))));
+        hub.createScene(admin, missingDeviceScene);
+
+        // 5. 执行并预期抛出 ExecutionException (设备未找到)
+        ExecutionException ex = assertThrows(ExecutionException.class, () -> {
+            hub.executeScene(admin, "MissingDeviceScene");
+        }, "场景执行必须因设备缺失而中断。");
+
+        // 6. 验证异常信息
+        assertTrue(ex.getMessage().contains("device missing Thermo1"), "异常信息应指明缺失的设备。");
+
+        // 7. 验证回滚：Light1 的状态必须恢复到场景执行前的状态 (即步骤 2 的 ON 状态)
+        DeviceState finalLightState = light1.getState();
+        assertTrue((Boolean) finalLightState.get("power"), "Light1 的状态应回滚到 ON。");
+        assertEquals(originalLightState.get("brightness"), finalLightState.get("brightness"), "Light1 的亮度应回滚到原始值。");
+
+
+    }
+
+    @Test
+    void role_CanControlDeviceLogic_IsAccurate() {
+        // Admin 角色：应能控制所有设备
+        assertTrue(admin.getRole().canControlDevice("LIGHT"), "Admin 应对 LIGHT 有权限。");
+        assertTrue(admin.getRole().canControlDevice("UNKNOWN"), "Admin 应对所有设备类型有权限。");
+
+        // Child 角色：仅有 LIGHT 权限
+        assertTrue(child.getRole().canControlDevice("LIGHT"), "Child 应对 LIGHT 有权限。");
+        assertFalse(child.getRole().canControlDevice("LOCK"), "Child 不应对 LOCK 有权限。");
+        assertFalse(child.getRole().canControlDevice("THERMOSTAT"), "Child 不应对 THERMOSTAT 有权限。");
+
+        // 检查未知设备类型：所有非 CONTROL_ALL_DEVICES 的角色，都应该对未知类型返回 false
+        assertFalse(parent.getRole().canControlDevice("UNKNOWN_DEVICE_TYPE"), "非 Admin 角色不应对未知设备类型有权限。");
+    }
+
+    @Test
+    void applyToGroup_UserLacksSomePermissions_SkipsUnauthorizedDevices() throws ExecutionException, ValidationException {
+        // 1. Child 用户的权限：只有 CONTROL_LIGHTS 和 VIEW_STATUS
+        //    Child 不具备控制 Lock 和 Thermostat 的权限。
+
+        // 2. 创建一个包含所有设备类型的群组
+        hub.createGroup(admin, "MixedGroup", List.of("Light1", "Thermo1", "Lock1"));
+
+        // 3. 记录设备初始状态
+        DeviceState originalThermoState = thermo1.getState(); // 期望 Thermo1 不变
+        DeviceState originalLockState = lock1.getState();     // 期望 Lock1 不变
+
+        // 4. 定义应用状态：Light: ON, Lock: UNLOCKED, Thermo: ON
+        DeviceState applyState = new DeviceState();
+        applyState.set("power", true);
+        applyState.set("locked", false); // Lock1 的状态
+
+        // 5. Child 执行群组操作：应该跳过 Lock1 和 Thermo1，只成功应用 Light1
+        hub.applyToGroup(child, "MixedGroup", applyState);
+
+        // 6. 验证 Light1 (有权限) 成功应用状态
+        assertTrue((Boolean) light1.getState().get("power"), "Light1 (Child有权限) 状态应为 ON。");
+
+        // 7. 验证 Thermo1 (无权限) 状态未改变 (被跳过)
+        assertEquals(originalThermoState.get("power"), thermo1.getState().get("power"), "Thermo1 (Child无权限) 状态应被跳过，保持不变。");
+
+        // 8. 验证 Lock1 (无权限) 状态未改变 (被跳过)
+        assertEquals(originalLockState.get("locked"), lock1.getState().get("locked"), "Lock1 (Child无权限) 状态应被跳过，保持不变。");
+    }
+
+    @Test
+    void deviceState_ExternalModification_DoesNotAffectInternalState() throws ValidationException {
+        // 1. 获取 Light1 的状态 (clone())
+        DeviceState stateClone = light1.getState();
+
+        // 2. 尝试修改这个克隆对象
+        stateClone.set("power", true);
+        stateClone.set("newKey", 123);
+
+        // 3. 验证 Light1 的实际内部状态没有被修改
+        assertFalse((Boolean) light1.getState().get("power"), "修改克隆对象不应影响设备实际状态（封装）。");
+        assertNull(light1.getState().get("newKey"), "设备内部不应有新的键值。");
+
+        // 4. 验证 asMap() 返回的 Map 是不可修改的
+        assertThrows(UnsupportedOperationException.class, () -> {
+            stateClone.asMap().put("attemptedModification", 456);
+        }, "asMap() 必须返回不可修改的 Map。");
+    }
+
+    @Test
+    void scene_GetActions_ReturnsUnmodifiableList() {
+        // 1. 创建场景并添加动作
+        Scene scene = new Scene("DefensiveScene");
+        SceneAction action = new SceneAction("Light1", new DeviceState());
+        scene.addAction(action);
+
+        // 2. 获取动作列表
+        List<SceneAction> actions = scene.getActions();
+
+        // 3. 尝试向返回的列表中添加新的动作
+        assertThrows(UnsupportedOperationException.class, () -> {
+            actions.add(new SceneAction("Thermo1", new DeviceState()));
+        }, "getActions() 必须返回不可修改的列表（防止外部破坏场景）。");
+    }
 }
+
