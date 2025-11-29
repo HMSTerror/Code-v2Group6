@@ -136,7 +136,6 @@ public class SmartHomeHub {
 
     // Apply action to group
     public void applyToGroup(User user, String groupName, DeviceState state) throws ExecutionException {
-        // need CONTROL_ALL_DEVICES permission to apply arbitrary state to a group
 
         DeviceGroup g = groups.get(groupName);
         if (g == null) throw new ExecutionException("Group not found: " + groupName);
