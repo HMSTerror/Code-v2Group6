@@ -5,7 +5,6 @@ import devices.DeviceState;
 import exceptions.ExecutionException;
 import exceptions.ValidationException;
 import users.Permission;
-import users.Role;
 import users.User;
 
 import java.util.*;

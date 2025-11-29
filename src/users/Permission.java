@@ -8,7 +8,6 @@ public enum Permission {
     CONTROL_LIGHTS,
     CONTROL_THERMOSTATS,
     CONTROL_LOCKS,
-    CONTROL_OWN_DEVICES, // reserved for future expansion
     EDIT_GROUPS,
     EDIT_SCENES,
     EXECUTE_SCENES,
