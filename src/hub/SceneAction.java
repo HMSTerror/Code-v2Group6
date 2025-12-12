@@ -1,19 +1,22 @@
 package hub;
 
+import devices.Device;
 import devices.DeviceState;
+import exceptions.ValidationException;
 
-/**
- * A SceneAction ties a device (by name) to a target DeviceState.
- */
 public class SceneAction {
-    private final String deviceName;
+    private final Device device;
     private final DeviceState targetState;
 
-    public SceneAction(String deviceName, DeviceState targetState) {
-        this.deviceName = deviceName;
+    // hold a field of type Device directly
+    public SceneAction(Device device, DeviceState targetState) {
+        this.device = device;
         this.targetState = targetState;
     }
 
-    public String getDeviceName() { return deviceName; }
-    public DeviceState getTargetState() { return targetState; }
+    public Device getDevice() { return device; }
+
+    public void execute() throws ValidationException {
+        device.applyState(targetState);
+    }
 }

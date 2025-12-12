@@ -1,4 +1,6 @@
-package users;
+package users.roles;
+
+import users.Permission;
 
 import java.util.Set;
 

@@ -1,5 +1,7 @@
 package users;
 
+import users.roles.Role;
+
 import java.util.Objects;
 
 /**
