@@ -19,11 +19,11 @@ public class SmartHomeHub {
         deviceRegistry.register(device);
     }
 
-    public void deregisterDevice(User user, String deviceName) {
+    public void deregisterDevice(User user, Device device) {
         if (!user.hasPermission(Permission.DEREGISTER_DEVICE)) {
             throw new SecurityException("Access Denied: User cannot deregister devices.");
         }
-        deviceRegistry.deregister(deviceName);
+        deviceRegistry.deregister(device);
     }
 
     public Collection<Device> getAllDevices() {

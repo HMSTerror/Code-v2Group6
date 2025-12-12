@@ -13,8 +13,11 @@ public class DeviceRegistry {
         devices.put(device.getName(), device);
     }
 
-    public void deregister(String deviceName) {
-        devices.remove(deviceName);
+    // Changed: Now accepts Device object
+    public void deregister(Device device) {
+        if (device != null) {
+            devices.remove(device.getName());
+        }
     }
 
     public Optional<Device> get(String name) {
