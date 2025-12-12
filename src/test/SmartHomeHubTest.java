@@ -4,7 +4,6 @@ import exceptions.ValidationException;
 import hub.Scene;
 import hub.SceneAction;
 import hub.SmartHomeHub;
-import users.Permission;
 import users.User;
 import users.roles.RoleFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +22,7 @@ public class SmartHomeHubTest {
     private SmartLight light1;
     private SmartThermostat thermo1;
     private SmartLock lock1;
+
 
     @BeforeEach
     void setUp() {
@@ -179,6 +179,7 @@ public class SmartHomeHubTest {
         assertThrows(UnsupportedOperationException.class, () -> {
             actions.add(new SceneAction(light1, new LightState(true, 50)));
         });
+
     }
 
     @Test
