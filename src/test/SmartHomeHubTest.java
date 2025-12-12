@@ -41,8 +41,6 @@ public class SmartHomeHubTest {
         hub.registerDevice(admin, lock1);
     }
 
-    // ... (Input Validation Tests 保持不变) ...
-
     @Test
     void state_Constructor_ValidatesInputRange() {
         assertThrows(IllegalArgumentException.class, () -> new LightState(true, 150));
