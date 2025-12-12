@@ -1,4 +1,6 @@
-package users;
+package users.roles;
+
+import users.Permission;
 
 import java.util.Collections;
 import java.util.Set;
@@ -10,7 +12,7 @@ public class Role {
     private final String name;
     private final Set<Permission> permissions;
 
-    public Role(String name, Set<Permission> permissions) {
+    Role(String name, Set<Permission> permissions) {
         this.name = name;
         this.permissions = Collections.unmodifiableSet(permissions);
     }

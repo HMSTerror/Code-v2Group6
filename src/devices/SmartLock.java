@@ -3,24 +3,22 @@ package devices;
 import exceptions.ValidationException;
 
 /**
- * SmartLock supports:
+ * SmartLock:
  *  - locked: Boolean
  */
 public class SmartLock extends Device {
-
     public SmartLock(String name) {
         super(name, "LOCK");
-        state.set("locked", true);
+        this.state = new LockState(true);
     }
 
     @Override
-    public synchronized void applyState(DeviceState targetState) throws ValidationException {
-        if (targetState == null) return;
-
-        Object l = targetState.get("locked");
-        if (l != null) {
-            if (!(l instanceof Boolean)) throw new ValidationException("locked must be boolean");
-            state.set("locked", l);
+    public void applyState(DeviceState targetState) throws ValidationException {
+        if (targetState instanceof LockState ls) {
+            this.state = ls;
+            System.out.println("-> [Lock] " + name + " set to " + ls);
+        } else {
+            throw new ValidationException("Invalid state type for SmartLock");
         }
     }
 }
